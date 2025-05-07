@@ -4,31 +4,52 @@
   <meta charset="UTF-8" />
   <title>PMGov - RP iframe</title>
   <script type="text/javascript">
-    var stat = "unchanged";
-    var client_id = "<%= @oic_session.client_config['client_id'] %>";
-    var check_interval = 5*1000;
-    var source_origin = window.location.origin;
-    var target_origin = new URL("<%= @oic_session.client_config['openid_connect_server_url'] %>").origin;
-    var session_state = "<%= @oic_session.session_state %>";
-    var mes = client_id + " " + session_state;
-    var reauthorize_url = "<%= oic_local_logout_url %>";
-    var timer = setInterval(checkSession(), check_interval);
+  var stat = "unchanged";
+  var client_id = "<%= @oic_session.client_config['client_id'] %>";
+  var check_interval = 5 * 1000;
+  var source_origin = window.location.origin;
+  var target_origin = new URL("<%= @oic_session.client_config['openid_connect_server_url'] %>").origin;
+  var session_state = "<%= @oic_session.session_state %>";
+  var mes = client_id + " " + session_state;
+  var reauthorize_url = "<%= oic_local_logout_url %>";
 
-    function checkSession() {
-      var opiframe = window.parent.document.getElementById("opiframe").contentWindow;
-      opiframe.postMessage( mes, target_origin);
-    }
+  console.log("RP iframe loaded");
+  console.log("Target origin:", target_origin);
+  console.log("Message to send:", mes);
 
-    window.addEventListener("message", receiveMessage, false);
-    function receiveMessage(e) {
-      if (e.origin !== target_origin) { return console.error('Wrong target origin: ' + target_origin); }
-      stat = e.data;
+  var timer = setInterval(checkSession, check_interval); 
 
-      if (stat == "changed") {
-        window.parent.location.href = reauthorize_url;
+  function checkSession() {
+    try {
+      var opiframe = window.parent.document.getElementById("opiframe");
+      if (opiframe && opiframe.contentWindow) {
+        console.log("Sending postMessage to OP iframe");
+        opiframe.contentWindow.postMessage(mes, target_origin);
+      } else {
+        console.warn("OP iframe not found");
       }
+    } catch (e) {
+      console.error("checkSession error:", e);
     }
-  </script>
+  }
+
+  window.addEventListener("message", receiveMessage, false);
+
+  function receiveMessage(e) {
+    if (e.origin !== target_origin) {
+      return console.error("Wrong origin: expected", target_origin, "but got", e.origin);
+    }
+    stat = e.data;
+    console.log("Received session status:", stat);
+
+    if (stat === "changed") {
+      console.warn("Session changed, redirecting to:", reauthorize_url);
+      window.parent.location.href = reauthorize_url;
+    }
+  }
+</script>
+
 </head>
 <body></body>
 </html>
+
